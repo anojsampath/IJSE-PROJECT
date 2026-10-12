@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Movie Booking Backend - User Guide</title>
+<style>
+:root { color-scheme: light; font-family: system-ui, "Segoe UI", sans-serif; color: #183047; background: #f2f5f8; line-height: 1.6; }
+body { max-width: 960px; margin: 0 auto; padding: 32px 22px 60px; }
+header, section { background: white; border: 1px solid #dce4ec; border-radius: 12px; padding: 24px 30px; margin: 20px 0; }
+header { border-top: 6px solid #166caa; }
+h1 { line-height: 1.2; margin: 12px 0; } h2 { color: #145784; margin-top: 0; } h3 { margin-bottom: 8px; }
+a { color: #095b98; } code { font-family: Consolas, monospace; font-size: .92em; overflow-wrap: anywhere; }
+pre { background: #f0f4f8; padding: 14px 18px; border-radius: 6px; overflow-x: auto; line-height: 1.5; }
+pre code { overflow-wrap: normal; } .note { border-left: 4px solid #d99e26; background: #fff8e8; padding: 12px 16px; }
+.badge { color: #145784; text-transform: uppercase; letter-spacing: .08em; font-size: .8em; font-weight: 700; }
+nav ul { columns: 2; padding-left: 20px; } table { border-collapse: collapse; width: 100%; font-size: .94em; }
+th, td { border-bottom: 1px solid #dce4ec; text-align: left; padding: 10px; vertical-align: top; }
+@media (max-width: 650px) { body { padding: 12px; } header, section { padding: 18px; } nav ul { columns: 1; } }
+@media print { body { background: white; max-width: none; padding: 0; font-size: 10pt; } header, section { border: 0; padding: 0; } pre { white-space: pre-wrap; } nav { display: none; } h2, h3 { break-after: avoid; } }
+</style>
+</head>
+<body>
+<header>
+<div class="badge">Coursework backend &middot; Version 0.0.1-SNAPSHOT</div>
+<h1>Movie Ticket Booking<br>User Guide</h1>
+<p>Run the backend on Windows, sign in, manage screenings, and demonstrate seat booking and simulated payments.</p>
+<p class="note"><strong>This is a REST API, not a graphical movie-booking website.</strong> Use PowerShell or an API client such as Postman. Opening the server address in a browser does not display a booking screen. Payments are simulated; no real money moves.</p>
+<nav aria-label="Contents"><ul>
+<li><a href="#quickstart">1. Start on the configured PC</a></li>
+<li><a href="#fresh">2. Set up an extracted ZIP</a></li>
+<li><a href="#signin">3. Sign in and use the API</a></li>
+<li><a href="#workflow">4. Demonstrate a booking</a></li>
+<li><a href="#rules">5. Roles and booking rules</a></li>
+<li><a href="#tests">6. Tests and ZIP packaging</a></li>
+<li><a href="#troubleshooting">7. Troubleshooting</a></li>
+<li><a href="#safety">8. Stop, restart, and protect data</a></li>
+</ul></nav>
+</header>
+<section id="quickstart">
+<h2>1. Start on the configured PC</h2>
+<p>Open PowerShell in the <strong>project folder</strong> containing <code>pom.xml</code> and <code>scripts</code>. File Explorer's address bar can be used to enter <code>powershell</code>. These instructions use Windows PowerShell 5.1 or later.</p>
+<p>If <code>.local/credentials.clixml</code> exists here, keep using that folder. Do not initialize it again. If the file is missing, follow section 2 first.</p>
+<h3>Terminal 1: MySQL</h3>
+<pre><code>.\scripts\Start-LocalMySql.ps1</code></pre>
+<p>Start it only if this project's MySQL is not already running. Keep the terminal open. The configured database normally listens on <code>127.0.0.1:3306</code>.</p>
+<h3>Terminal 2: Application</h3>
+<pre><code>.\scripts\Start-LocalApp.ps1</code></pre>
+<p>Wait for <code>Started MovieBookingApplication</code>. The local API normally uses <code>http://127.0.0.1:8081</code>. The script prints the configured address, loads encrypted credentials, and starts the built JAR or the bundled JAR.</p>
+<h3>Terminal 3: Verify connectivity and sign-in</h3>
+<pre><code>.\scripts\Test-LocalApi.ps1</code></pre>
+<p>Expected: PASS messages for anonymous access returning 401, administrator sign-in, and authenticated user/movie lists. This default check does not create or change business records.</p>
+<p>Do not start a second API process if the first is running. You can check listening ports without stopping anything:</p>
+<pre><code>Get-NetTCPConnection -State Listen |
+    Where-Object { $_.LocalPort -in 3306,8081 } |
+    Select-Object LocalAddress,LocalPort,OwningProcess</code></pre>
+</section>
+<section id="fresh">
+<h2>2. Set up an extracted ZIP</h2>
+<ol>
+<li>Install a <strong>Java 21 JDK</strong>. Confirm <code>java -version</code> reports version 21.</li>
+<li>Install <strong>MySQL Server 8.4</strong>; Workbench alone is not sufficient. The helpers use its installed binaries, with a separate project-owned data directory. They do not change another database or install a Windows service.</li>
+<li>Extract the ZIP completely to a writable local folder. Open the inner <code>movie-booking</code> folder, not the ZIP preview. Avoid a network/shared folder. Open PowerShell there.</li>
+<li>If Windows blocks the downloaded scripts, inspect their contents first, then unblock the trusted scripts:<pre><code>Get-ChildItem .\scripts\*.ps1 | Unblock-File</code></pre>If local script execution is still blocked, a session-only policy can be used on a PC you manage:<pre><code>Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned</code></pre>Do not change machine-wide policy or override an organization's policy.</li>
+</ol>
+<p class="note">The ZIP intentionally contains <strong>no credentials, accounts, database files, Java installation, or MySQL installation</strong>. Each new extraction needs its own initialization. Do not copy another PC's <code>.local</code> folder: credentials are encrypted for the original Windows account and computer.</p>
+<h3>Step A: Initialize once</h3>
+<pre><code>.\scripts\Initialize-LocalMySql.ps1</code></pre>
+<p>Default installation: <code>C:\Program Files\MySQL\MySQL Server 8.4</code>. If that path differs, or another application already uses port 3306 or 8081, choose unused ports at initialization:</p>
+<pre><code>.\scripts\Initialize-LocalMySql.ps1 `
+    -MySqlHome 'C:\Program Files\MySQL\MySQL Server 8.4' `
+    -DatabasePort 3307 -ApplicationPort 8082</code></pre>
+<p>Use <strong>one</strong> initialization command, not both. Existing local data/credentials are never overwritten. The chosen ports are saved and reused by the helper scripts.</p>
+<h3>Step B: First MySQL startup (Terminal 1)</h3>
+<pre><code>.\scripts\Start-LocalMySql.ps1 -FirstStart</code></pre>
+<p>Keep this terminal open. First startup creates isolated <code>movie_booking</code> and <code>movie_booking_test</code> databases and accounts.</p>
+<h3>Step C: First application startup (Terminal 2)</h3>
+<pre><code>.\scripts\Start-LocalApp.ps1 -BootstrapAdmin</code></pre>
+<p>The included <code>app/movie-booking.jar</code> runs without Maven or a dependency download. For a source checkout with no JAR, load the environment and run <code>.\mvnw.cmd verify</code> first; building requires internet access on the first run. Flyway creates application tables automatically. Do not import the migration SQL manually.</p>
+<h3>Step D: Verify and finish setup (Terminal 3)</h3>
+<pre><code>.\scripts\Test-LocalApi.ps1
+. .\scripts\Use-LocalEnvironment.ps1
+.\mvnw.cmd verify -Pintegration</code></pre>
+<p>Require successful administrator sign-in and passing MySQL integration tests to verify both database accounts. After success, use File Explorer to <strong>delete <code>.local/mysql-bootstrap.sql</code></strong>: it is a temporary plaintext setup file and must never be shared. Do not use <code>-FirstStart</code> again.</p>
+<p>Stop the API with Ctrl+C in Terminal 2, then run <code>.\scripts\Start-LocalApp.ps1</code> without <code>-BootstrapAdmin</code>. The administrator remains in the database. Future sessions use section 1 only.</p>
+<p>Already managing your own MySQL database? Use the manual database and environment instructions in <a href="README.md">README.md</a>, then run <code>java -jar app/movie-booking.jar</code>. The local helper scripts require their generated local configuration and are not used in that manual setup.</p>
+</section>
+<section id="signin">
+<h2>3. Sign in and use the API</h2>
+<p>The local administrator is <code>admin@example.com</code>, with a randomly generated password stored using Windows encryption. There is no shared default password.</p>
+<p>In a new PowerShell terminal, run the following. The leading dot and space before the environment script are important: they load its values into the current session.</p>
+<pre><code>. .\scripts\Use-LocalEnvironment.ps1
+$base = "http://127.0.0.1:$env:PORT/api"
+$login = @{
+    email = $localConfig.AdminEmail
+    password = (ConvertFrom-LocalSecret $localConfig.AdminPassword)
+}
+$session = Invoke-RestMethod -Method POST -Uri "$base/auth/signin" `
+    -ContentType 'application/json' -Body ($login | ConvertTo-Json)
+$login = $null
+$headers = @{ Authorization = "Bearer $($session.token)" }
+Invoke-RestMethod -Uri "$base/movies" -Headers $headers</code></pre>
+<p>These commands do not print the password or token. Keep both private. Tokens expire after one hour; sign in again when a request returns 401.</p>
+<h3>Using Postman or another API client</h3>
+<ol>
+<li>Register a customer with <code>POST /api/auth/signup</code>, JSON body containing <code>name</code>, <code>email</code>, and a password you choose. Passwords must be at least eight characters and at most 72 UTF-8 bytes. Signup always creates CUSTOMER.</li>
+<li>Send <code>POST /api/auth/signin</code> with your <code>email</code> and <code>password</code>.</li>
+<li>Use the returned <code>token</code> as a Bearer token in the client's Authorization tab. Do not export a collection or screenshot containing live credentials.</li>
+<li>Use the configured base URL, normally <code>http://127.0.0.1:8081</code>. Set request bodies to raw JSON and <code>Content-Type: application/json</code>.</li>
+</ol>
+<p>Example customer-registration JSON (replace the sample credentials with your own):</p>
+<pre><code>{
+  "name": "Sample Customer",
+  "email": "customer@example.com",
+  "password": "ChooseYourOwnPassword123!"
+}</code></pre>
+<p>Use the administrator PowerShell session above for catalog management. The complete endpoint table and request examples are in <a href="README.md">README.md</a>.</p>
+</section>
+<section id="workflow">
+<h2>4. Demonstrate a complete booking</h2>
+<p>With MySQL and the API running:</p>
+<pre><code>.\scripts\Test-LocalApi.ps1 -CreateDemo</code></pre>
+<p class="note">This option <strong>creates persistent, uniquely labeled demo records in the development database</strong>. It does not use real payments, delete existing data, or reveal credentials. Each run adds a customer, movie, theatre, show, booking, and payment; it finishes with the booking canceled and payment refunded. The generated customer's password is not retained for later sign-in; use your own customer account for manual demonstrations.</p>
+<ol>
+<li>Verify anonymous requests are rejected and the administrator can sign in.</li>
+<li>Create a demo movie, 52-seat theatre, and screening seven days in the future.</li>
+<li>Register a demo customer and reserve seats A1 and A2 at LKR 1,250.50 each.</li>
+<li>Verify the server-calculated total is LKR 2,501.00 and both seats are reserved.</li>
+<li>Create a SIMULATED payment, process a FAILED result, then retry successfully using the same payment ID.</li>
+<li>Verify the booking becomes CONFIRMED.</li>
+<li>Cancel the booking, verify REFUNDED payment status, and verify both seats are available again.</li>
+</ol>
+<p>Expected: all checks report PASS, followed by IDs and final statuses. The sample screening remains in the catalog and can be used for manual bookings with your own customer.</p>
+<h3>Manual workflow</h3>
+<table>
+<thead><tr><th>Actor</th><th>Action</th><th>Endpoint</th></tr></thead>
+<tbody>
+<tr><td>ADMIN</td><td>Create movie, theatre, then a future show</td><td><code>POST /api/movies</code>, <code>/api/theatres</code>, <code>/api/shows</code></td></tr>
+<tr><td>CUSTOMER</td><td>View available seats</td><td><code>GET /api/shows/{id}/seats</code></td></tr>
+<tr><td>CUSTOMER</td><td>Reserve seats</td><td><code>POST /api/bookings</code></td></tr>
+<tr><td>CUSTOMER</td><td>Create and process payment</td><td><code>POST /api/payments</code>, <code>POST /api/payments/{id}/process</code></td></tr>
+<tr><td>Owner / ADMIN</td><td>View booking or cancel before start</td><td><code>GET /api/bookings/{id}</code>, <code>PUT /api/bookings/{id}/cancel</code></td></tr>
+</tbody></table>
+<p>Use returned IDs, not hardcoded IDs. A booking request contains <code>showId</code>, <code>seatNumbers</code>, and <code>numberOfTickets</code>. Payment creation contains <code>bookingId</code> and <code>paymentMethod: "SIMULATED"</code>. Processing contains <code>outcome: "COMPLETED"</code> or <code>"FAILED"</code>. Amounts are calculated by the server.</p>
+</section>
+<section id="rules">
+<h2>5. Roles and booking rules</h2>
+<ul>
+<li><strong>ADMIN:</strong> manages users, movies, theatres, and shows; lists bookings/payments; can inspect and cancel customer bookings.</li>
+<li><strong>CUSTOMER:</strong> reads the authenticated catalog, books seats, pays for their own bookings, and views/cancels their own bookings.</li>
+<li>Screening times use <strong>Asia/Colombo</strong>; prices are <strong>LKR</strong>. Shows cannot overlap in the same theatre, even across midnight.</li>
+<li>Seats use ten positions per row: A1-A10, B1-B10, and so on; the final row is limited to theatre capacity.</li>
+<li>PENDING and CONFIRMED bookings reserve seats. Reservations do not expire automatically in this version.</li>
+<li>A seat map is a snapshot. A competing booking can still cause 409; reload available seats and select another seat.</li>
+<li>A successful payment confirms the booking. Failed payments can be retried using the same payment ID. Completed/refunded payments cannot be processed again.</li>
+<li>Canceling before show start releases seats and simulates a refund for completed payments. Canceled bookings cannot reopen.</li>
+<li>Referenced records cannot be deleted. Preserve booking/payment history. Administrators cannot delete or demote their own account.</li>
+</ul>
+</section>
+<section id="tests">
+<h2>6. Tests and ZIP packaging</h2>
+<p>From the project root:</p>
+<pre><code># Local unit and H2 workflow tests (no MySQL required):
+.\mvnw.cmd test
+
+# Full verification with an isolated MySQL test database:
+. .\scripts\Use-LocalEnvironment.ps1
+.\mvnw.cmd verify -Pintegration
+
+# Verify formatting:
+.\mvnw.cmd spotless:check
+
+# Run verification and create a new ZIP:
+.\scripts\Build-Distribution.ps1</code></pre>
+<p>The current suite contains <strong>25 local tests and 16 MySQL integration tests</strong>, including concurrency, ownership, validation, and payment rollback. Reports are under <code>target/surefire-reports</code> and <code>target/failsafe-reports</code>. MySQL tests require the isolated <code>movie_booking_test</code> database and user. They retain test fixtures and must never target business data.</p>
+<p>The packaging command requires successful formatting checks and all tests without skips. It creates a timestamped ZIP in <code>dist</code> plus a <code>.zip.sha256</code> checksum. Inside the archive, <code>DISTRIBUTION-MANIFEST.json</code> records verification counts and SHA-256 hashes of each included file.</p>
+<table><thead><tr><th>Included</th><th>Not included</th></tr></thead><tbody>
+<tr><td>Runnable JAR, source, tests, migrations, Maven Wrapper, setup/start/demo scripts, this guide, README, manifest</td><td>Local credentials, database files, logs, Git history, dependency caches, test-report XML, installed Java/MySQL binaries</td></tr>
+</tbody></table>
+<p>Compare <code>Get-FileHash -Algorithm SHA256 -Path .\dist\&lt;archive-name&gt;.zip</code> with the accompanying checksum file after copying the ZIP. Do not manually compress the whole workspace: <code>.gitignore</code> does not protect secrets in arbitrary ZIP tools.</p>
+<p>This guide works offline after extraction. You can print it or use your browser's <strong>Print &rarr; Save as PDF</strong>.</p>
+</section>
+<section id="troubleshooting">
+<h2>7. Troubleshooting</h2>
+<table><thead><tr><th>Symptom</th><th>What to do</th></tr></thead><tbody>
+<tr><td>No webpage / 401 at the server</td><td>There is no frontend. Run the API-check script, or sign in and send a Bearer token. An anonymous catalog request returning 401 is expected.</td></tr>
+<tr><td>Java not found / class version error</td><td>Install/select Java 21 and reopen PowerShell. Check <code>java -version</code>.</td></tr>
+<tr><td>Local configuration missing</td><td>Make sure you opened the original configured folder; a new extraction needs section 2. Do not initialize over existing data.</td></tr>
+<tr><td>Port already in use</td><td>Check whether this project's server is already running. Do not stop unrelated software. For a fresh installation, choose unused ports in the initializer.</td></tr>
+<tr><td>MySQL connection refused</td><td>Start MySQL in Terminal 1 and confirm its configured port. Run the environment helper in the same shell as a manual Java/Maven command.</td></tr>
+<tr><td>MySQL access denied / first setup incomplete</td><td>Confirm the correct project folder and Windows user. First initialization needs <code>-FirstStart</code> once. Inspect <code>.local/mysql-error.log</code> privately. If initialization failed, preserve the folder and diagnose the error; do not blindly rerun initialization or first-start SQL.</td></tr>
+<tr><td>Cannot decrypt credentials</td><td>DPAPI credentials belong to their original Windows account and PC. For another computer use a fresh extraction and fresh setup, not copied credentials.</td></tr>
+<tr><td>401 after successful use</td><td>Sign in again; the JWT expires after one hour. A deleted account or changed signing key also invalidates access.</td></tr>
+<tr><td>403 Forbidden</td><td>Use the required role or the booking's owner account. A customer cannot manage catalog records or inspect another customer's bookings.</td></tr>
+<tr><td>400 / 404 / 409</td><td>400: check JSON and validation field errors. 404: use an existing returned ID. 409: check seat occupancy, scheduling overlap, lifecycle restrictions, or referenced history.</td></tr>
+<tr><td>JAR missing</td><td>Re-extract the complete ZIP, or run <code>.\mvnw.cmd verify</code> from the source root. The launch helper checks <code>target</code> first, then <code>app</code>.</td></tr>
+<tr><td>Maven download fails</td><td>Check internet/proxy access to Maven Central and Java configuration. Maven is bundled through the Wrapper; no global Maven installation is required. Offline JAR execution still requires installed Java and running MySQL.</td></tr>
+<tr><td>Flyway / Mockito warnings</td><td>The current dependency set can warn about MySQL 8.4 being newer than Flyway's verified version and Mockito dynamic-agent attachment. These warnings did not prevent the verified test run. Actual migration errors or failing tests require investigation.</td></tr>
+</tbody></table>
+</section>
+<section id="safety">
+<h2>8. Stop, restart, and protect data</h2>
+<ol>
+<li>Stop the API first using Ctrl+C in its dedicated terminal.</li>
+<li>Stop MySQL using Ctrl+C in its dedicated terminal. Wait for the process to exit; do not force-kill it while saving data.</li>
+<li>For the next session, start MySQL and then the API using section 1. Do not use initialization or first-start switches again.</li>
+</ol>
+<p>Data survives normal restarts in <code>.local/mysql-data</code>. Do not delete or replace that directory to fix an application issue. Back up valuable data with approved database tools. The ZIP is a <strong>software distribution, not a backup of your bookings</strong>.</p>
+<p>Keep <code>.local</code>, decrypted passwords, JWTs, and private logs out of email, Git, and shared ZIPs. Local helpers bind to loopback only; do not expose this development setup directly to the internet. Remote deployment requires HTTPS, verified database TLS, secure secret management, and a real payment provider.</p>
+<p>Technical details, the ERD, all endpoints, and future expansion proposals are in <a href="README.md">README.md</a>. GitHub publication is a separate action; generating this ZIP does not commit or push code.</p>
+</section>
+</body>
+</html>

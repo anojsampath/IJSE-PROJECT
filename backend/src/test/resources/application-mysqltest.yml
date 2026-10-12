@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: ${DB_TEST_URL}
+    username: ${DB_TEST_USERNAME}
+    password: ${DB_TEST_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+app:
+  admin:
+    enabled: false
+logging:
+  level:
+    lk.ijse.moviebooking: WARN

@@ -1,0 +1,27 @@
+target/
+dist/
+app/
+DISTRIBUTION-MANIFEST.json
+**/.mvn/bootstrap/
+**/.mvn/repository/
+**/.mvn/wrapper/dists/
+.idea/
+.vscode/
+.qoder/
+.local/
+*.iml
+*.log
+.env
+.env.*
+!.env.example
+application-local.*
+
+# Frontend (React/Vite)
+node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.local
+npm-debug.log*
+yarn-error.log*
+.vite/
+coverage/
